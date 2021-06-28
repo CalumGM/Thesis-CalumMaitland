@@ -14,14 +14,10 @@ void setup()
 }
 void loop()
 {
-
   while (mySerial.available())
   {
-    
     myChar = mySerial.read();
     Serial.print(myChar);
-    if (i == 8){
-      Serial.print("\n");
-    }
+    //Serial.println(""); // when converted to hex, this prints 0d 0a
   }
 }
