@@ -1,21 +1,22 @@
 line = zeros(1, 10);
-fileID = serial('COM7','BaudRate',57600);
+fileID = serial('COM6','BaudRate',57600);
 fopen(fileID);
 readPacket = false;
-time = 0;
-timestep = 1/512;
-
+i = 0;
+rawValues = zeros(1, 1000);
+time = zeros(1, 1000);
 figure(1);
 xlabel("Time (ms)")
-ylabel("Amplitude (mV)")
+ylabel("Amplitude (mV)") % different Y axis
+xlim([0 1000]);
+% ylim([-32768 32768]);
 title("Raw EEG Plot")
-hold on
-while true
+hold all;
+for j = 1:1000
     firstChar = readByte(fileID);
     if (firstChar == 170)
         secondChar = readByte(fileID);
         if (secondChar == 170)
-            readPacket = true;
             % after AA AA is read in sequence
             payloadSize = readByte(fileID);
             eight_zero = readByte(fileID);
@@ -23,31 +24,47 @@ while true
             high = readByte(fileID); 
             low = readByte(fileID);
             checksum = readByte(fileID);
+            
+            % disp('Data Recieved')
+            % fprintf('%i %i %i %i %i %i %i %i\n', firstChar, secondChar, payloadSize, eight_zero, zero_two, high, low, checksum);
+            
+            generatedChecksum = 255 - (eight_zero + zero_two + high + low);
+            passed = (checksum == generatedChecksum);
+            raw = calculateRawValue(high, low);
+            
+            % fprintf('Raw Value: %i\n', raw)
+            if (passed)
+                i = i+1;
+                rawValues(i) = raw;
+                time(i) = i;
+                plot(i, raw, 'r-o')
+                drawnow;
+            end
         end
-    end
-    if (readPacket)
-        break;
-    end    
+    end  
 end
-
-
+disp("closing file")
 fclose(fileID);
-disp('Data Recieved')
-fprintf('%i %i %i %i %i %i %i %i\n', firstChar, secondChar, payloadSize, eight_zero, zero_two, high, low, checksum);
 
-generatedChecksum = 255 - (eight_zero + zero_two + high + low);
-if (checksum == generatedChecksum)
-    fprintf("Checksum passed: %i = %i\n", generatedChecksum, checksum)
-else 
-    fprintf("Checksum failed: %i != %i\n", generatedChecksum, checksum)
+
+function [raw] = calculateRawValue(high, low)
+    raw = (high*256)+low;
+    if (raw >= 32768)
+        raw = raw - 65536; % 2's compliment
+    end
 end
 
-
-raw = (high*256)+low;
-if (raw >= 32768)
-    raw = raw - 65536; % 2's compliment
+%{
+function [passed] = validateData(generatedChecksum, checksum)
+    if (checksum == generatedChecksum)
+        fprintf("Checksum passed: %i = %i\n", generatedChecksum, checksum)
+    else 
+        fprintf("Checksum failed: %i != %i\n", generatedChecksum, checksum)
+    end
+    passed = (checksum == generatedChecksum);
 end
-fprintf('Raw Value: %i\n', raw)
+%}
+
 
 
 function [myByte] = readByte(fileID)
